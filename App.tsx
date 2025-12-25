@@ -5,11 +5,12 @@ import Dashboard from './components/Dashboard';
 import WorkoutView from './components/WorkoutView';
 import NutritionView from './components/NutritionView';
 import AICoachView from './components/AICoachView';
-import { Home, Dumbbell, Apple, MessageCircle, User as UserIcon, ArrowRight, ChevronLeft, Venus, Mars, CircleSlash, Camera, Plus, Trash2, Calendar } from 'lucide-react';
+import { Home, Dumbbell, Apple, MessageCircle, User as UserIcon, ArrowRight, ChevronLeft, Venus, Mars, CircleSlash, Camera, Plus, Trash2, Calendar, RefreshCw } from 'lucide-react';
 
 const TRANSLATIONS = {
   en: {
     hub: 'HUB', train: 'TRAIN', fuel: 'FUEL', titan: 'TITAN', pro: 'PRO',
+    loading: 'WAKING UP THE TITAN...',
     onboarding: { 
       step: 'Step', of: 'of', launch: 'LAUNCH TITAN', continue: 'CONTINUE', 
       name_q: "What's your name, Titan?", 
@@ -29,6 +30,7 @@ const TRANSLATIONS = {
   },
   pt: {
     hub: 'INÍCIO', train: 'TREINAR', fuel: 'NUTRIÇÃO', titan: 'COACH', pro: 'PERFIL',
+    loading: 'DESPERTANDO O TITÃ...',
     onboarding: { 
       step: 'Passo', of: 'de', launch: 'LANÇAR TITAN', continue: 'CONTINUAR', 
       name_q: "Qual seu nome, Titã?", 
@@ -48,8 +50,8 @@ const TRANSLATIONS = {
   }
 };
 
-const STORAGE_KEY = 'titanfit_user_profile';
-const PROGRESS_KEY = 'titanfit_weight_history';
+const STORAGE_KEY = 'titanfit_user_profile_v1';
+const PROGRESS_KEY = 'titanfit_weight_history_v1';
 
 const INITIAL_PROFILE: UserProfile = {
   name: '', weight: 70, targetWeight: 65, height: 170, age: 25, activityLevel: 'Moderately Active', goal: 'Weight Loss', language: 'pt', gender: 'Male',
@@ -58,12 +60,9 @@ const INITIAL_PROFILE: UserProfile = {
 
 const MOCK_PROGRESS: ProgressData[] = [
   { date: '01/05', weight: 75.0, caloriesBurned: 450 },
-  { date: '05/05', weight: 74.6, caloriesBurned: 600 },
-  { date: '10/05', weight: 74.8, caloriesBurned: 300 },
-  { date: '15/05', weight: 74.1, caloriesBurned: 750 },
-  { date: '20/05', weight: 73.9, caloriesBurned: 500 },
-  { date: '25/05', weight: 73.5, caloriesBurned: 800 },
-  { date: '30/05', weight: 73.2, caloriesBurned: 400 },
+  { date: '10/05', weight: 74.5, caloriesBurned: 600 },
+  { date: '20/05', weight: 74.0, caloriesBurned: 700 },
+  { date: '30/05', weight: 73.2, caloriesBurned: 800 },
 ];
 
 const App: React.FC = () => {
@@ -77,22 +76,31 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evolutionInputRef = useRef<{ type: 'before' | 'after' | 'profile' | null }>({ type: null });
 
-  // Load Data
+  // Load Data with resilience
   useEffect(() => {
-    const savedProfile = localStorage.getItem(STORAGE_KEY);
-    const savedProgress = localStorage.getItem(PROGRESS_KEY);
-    
-    if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
-      setView('dashboard');
+    try {
+      const savedProfile = localStorage.getItem(STORAGE_KEY);
+      const savedProgress = localStorage.getItem(PROGRESS_KEY);
+      
+      if (savedProfile) {
+        const parsed = JSON.parse(savedProfile);
+        setProfile(parsed);
+        setView('dashboard');
+      }
+      
+      if (savedProgress) {
+        setProgress(JSON.parse(savedProgress));
+      } else {
+        setProgress(MOCK_PROGRESS);
+      }
+    } catch (e) {
+      console.error("Critical: Storage corruption detected. Resetting app state.", e);
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(PROGRESS_KEY);
+    } finally {
+      // Small delay to show splash screen
+      setTimeout(() => setIsLoaded(true), 1500);
     }
-    
-    if (savedProgress) {
-      setProgress(JSON.parse(savedProgress));
-    } else {
-      setProgress(MOCK_PROGRESS);
-    }
-    setIsLoaded(true);
   }, []);
 
   // Sync Data
@@ -108,6 +116,10 @@ const App: React.FC = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'before' | 'after') => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert(profile.language === 'pt' ? "Imagem muito grande! Máximo 2MB." : "Image too large! Max 2MB.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64String = reader.result as string;
@@ -149,13 +161,30 @@ const App: React.FC = () => {
   };
 
   const resetIdentity = () => {
-    if (confirm(profile.language === 'pt' ? 'Tem certeza que deseja reiniciar? Todos os dados serão perdidos.' : 'Are you sure? All data will be lost.')) {
+    if (confirm(profile.language === 'pt' ? 'Isso apagará TODOS os seus dados salvos. Continuar?' : 'This will delete ALL saved data. Continue?')) {
       localStorage.clear();
       window.location.reload();
     }
   };
 
-  if (!isLoaded) return null;
+  // SplashScreen
+  if (!isLoaded) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center p-10 z-[100]">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-emerald-500 blur-3xl opacity-20 animate-pulse" />
+          <div className="w-24 h-24 bg-slate-800 rounded-[2.5rem] border-2 border-emerald-500 flex items-center justify-center shadow-2xl relative">
+            <Trophy className="text-emerald-500" size={48} />
+          </div>
+        </div>
+        <h1 className="text-2xl font-black text-white tracking-[0.2em] mb-4">TITANFIT</h1>
+        <div className="flex items-center gap-3 text-emerald-500/60 font-black text-[10px] tracking-widest uppercase">
+          <RefreshCw className="animate-spin" size={14} />
+          {profile.language === 'pt' ? 'DESPERTANDO O TITÃ...' : 'WAKING UP THE TITAN...'}
+        </div>
+      </div>
+    );
+  }
 
   const renderView = () => {
     switch (view) {
@@ -360,5 +389,17 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+// Add missing icon for splash screen
+const Trophy = ({ size, className }: { size: number, className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+    <path d="M4 22h16" />
+    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+  </svg>
+);
 
 export default App;

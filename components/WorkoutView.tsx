@@ -3,7 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, Workout, ProgressData } from '../types';
 import { generateDailyWorkout } from '../services/geminiService';
 import ProgressChart from './ProgressChart';
-import { Play, Clock, Zap, RefreshCw, Activity, ChevronDown, Info, Check, X, Target, Sparkles, ArrowRight, TrendingDown, TrendingUp, History, Plus, Dumbbell, Home, Timer, Shield, Calendar, ArrowLeft } from 'lucide-react';
+import { 
+  Play, Clock, Zap, RefreshCw, Activity, ChevronDown, Info, Check, X, 
+  Target, Sparkles, ArrowRight, TrendingDown, TrendingUp, History, 
+  Plus, Dumbbell, Home, Timer, Shield, Calendar, ArrowLeft,
+  Music, Pause, SkipForward, SkipBack, Volume2, Upload
+} from 'lucide-react';
 
 interface Props { 
   profile: UserProfile; 
@@ -11,8 +16,20 @@ interface Props {
   onPlanRequest?: (prompt: string) => void;
 }
 
+interface Track {
+  name: string;
+  artist: string;
+  url: string;
+}
+
 const STORAGE_WORKOUT_KEY = 'titanfit_daily_workout';
 const DEFAULT_REST_TIME = 45;
+
+const TITAN_BEATS: Track[] = [
+  { name: "Phonk Titan", artist: "Titan Records", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+  { name: "Iron Will", artist: "Beast Mode", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+  { name: "Cyber Grind", artist: "Neon Pulse", url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+];
 
 const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
   const [workout, setWorkout] = useState<Workout | null>(null);
@@ -21,6 +38,14 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [showFullHistory, setShowFullHistory] = useState(false);
   
+  // Music Player State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  const [tracks, setTracks] = useState<Track[]>(TITAN_BEATS);
+  const [volume, setVolume] = useState(0.5);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [isResting, setIsResting] = useState(false);
   const [restTimeRemaining, setRestTimeRemaining] = useState(DEFAULT_REST_TIME);
@@ -53,8 +78,26 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
 
   useEffect(() => {
     fetchWorkout();
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => { 
+      if (timerRef.current) clearInterval(timerRef.current); 
+      if (audioRef.current) audioRef.current.pause();
+    };
   }, []);
+
+  // Audio Side Effects
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      audioRef.current?.play().catch(e => console.warn("Audio play blocked", e));
+    } else {
+      audioRef.current?.pause();
+    }
+  }, [isPlaying, currentTrackIndex]);
 
   useEffect(() => {
     if (isResting && restTimeRemaining > 0) {
@@ -64,6 +107,33 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [isResting, restTimeRemaining]);
+
+  const toggleMusic = () => setIsPlaying(!isPlaying);
+  
+  const nextTrack = () => {
+    setCurrentTrackIndex((prev) => (prev + 1) % tracks.length);
+    setIsPlaying(true);
+  };
+
+  const prevTrack = () => {
+    setCurrentTrackIndex((prev) => (prev - 1 + tracks.length) % tracks.length);
+    setIsPlaying(true);
+  };
+
+  const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      const newTrack: Track = {
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        artist: isPt ? "Meu Arquivo" : "My File",
+        url: url
+      };
+      setTracks([newTrack, ...tracks]);
+      setCurrentTrackIndex(0);
+      setIsPlaying(true);
+    }
+  };
 
   const handleCustomRequest = (overridePrompt?: string) => {
     const promptToUse = overridePrompt || customPrompt;
@@ -97,16 +167,29 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
     );
   }
 
+  const currentTrack = tracks[currentTrackIndex];
+
   if (isResting && workout && activeStep !== null) {
     const nextExercise = workout.exercises[activeStep + 1];
     return (
       <div className="fixed inset-0 z-[60] bg-slate-900/98 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300">
         <h2 className="text-4xl font-black text-white italic mb-12 uppercase tracking-tighter">{isPt ? 'DESCANSE' : 'REST'}</h2>
         <div className="text-7xl font-black text-emerald-500 mb-16 tabular-nums">{restTimeRemaining}s</div>
-        <div className="bg-slate-800/50 p-6 rounded-[2rem] border border-white/5 mb-12 w-full max-w-sm">
+        
+        <div className="bg-slate-800/50 p-6 rounded-[2rem] border border-white/5 mb-8 w-full max-w-sm">
           <span className="text-[10px] font-black text-slate-500 uppercase block mb-1 tracking-widest">{isPt ? 'PRÓXIMO' : 'NEXT UP'}</span>
           <h3 className="text-xl font-black text-white uppercase">{nextExercise.name}</h3>
         </div>
+
+        {/* Mini Music Control in Rest Screen */}
+        <div className="flex items-center gap-6 mb-12 bg-slate-800/30 px-6 py-4 rounded-3xl border border-white/5">
+          <button onClick={prevTrack} className="text-slate-500 hover:text-white transition-colors"><SkipBack size={24} /></button>
+          <button onClick={toggleMusic} className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 active:scale-90 transition-all">
+            {isPlaying ? <Pause size={28} fill="white" /> : <Play size={28} fill="white" />}
+          </button>
+          <button onClick={nextTrack} className="text-slate-500 hover:text-white transition-colors"><SkipForward size={24} /></button>
+        </div>
+
         <button onClick={handleSkipRest} className="w-full max-w-sm bg-emerald-600 py-6 rounded-3xl font-black text-white shadow-xl shadow-emerald-900/30">PULAR DESCANSO</button>
       </div>
     );
@@ -114,6 +197,13 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-500">
+      <audio 
+        ref={audioRef} 
+        src={currentTrack.url} 
+        onEnded={nextTrack}
+        autoPlay={isPlaying}
+      />
+      
       {showFullHistory && (
         <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col p-6 animate-in slide-in-from-bottom-10">
           <header className="flex justify-between items-center mb-10 mt-6">
@@ -130,6 +220,75 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
           </div>
         </div>
       )}
+
+      {/* Titan Beats Player */}
+      <div className="bg-slate-800/40 backdrop-blur-md p-6 rounded-[2.5rem] border border-white/5 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-4 opacity-5 scale-150 rotate-12 pointer-events-none group-hover:opacity-10 transition-opacity">
+          <Music size={120} className="text-emerald-400" />
+        </div>
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Music size={16} className="text-emerald-500" />
+            <h3 className="text-[10px] font-black text-slate-200 uppercase tracking-widest">
+              {isPt ? 'TITAN BEATS' : 'TITAN BEATS'}
+            </h3>
+          </div>
+          <button 
+            onClick={() => musicInputRef.current?.click()}
+            className="p-2 bg-white/5 rounded-xl text-slate-400 hover:text-emerald-500 transition-all active:scale-90"
+          >
+            <Upload size={18} />
+          </button>
+          <input 
+            type="file" 
+            ref={musicInputRef} 
+            onChange={handleMusicUpload} 
+            accept="audio/*" 
+            className="hidden" 
+          />
+        </div>
+
+        <div className="flex items-center gap-5">
+          <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center border border-white/5 shrink-0 relative overflow-hidden">
+             {isPlaying && (
+               <div className="absolute inset-0 flex items-center justify-center gap-1">
+                 <div className="w-1 bg-emerald-500 h-4 animate-bounce" style={{ animationDelay: '0s' }} />
+                 <div className="w-1 bg-emerald-500 h-6 animate-bounce" style={{ animationDelay: '0.2s' }} />
+                 <div className="w-1 bg-emerald-500 h-3 animate-bounce" style={{ animationDelay: '0.4s' }} />
+               </div>
+             )}
+             {!isPlaying && <Music className="text-slate-700" size={32} />}
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <h4 className="font-black text-white text-sm truncate uppercase tracking-tight">{currentTrack.name}</h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{currentTrack.artist}</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+             <button onClick={prevTrack} className="p-2 text-slate-500 hover:text-white transition-colors active:scale-90"><SkipBack size={20} /></button>
+             <button 
+               onClick={toggleMusic} 
+               className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-900/30 active:scale-95 transition-all"
+             >
+               {isPlaying ? <Pause size={24} fill="white" /> : <Play size={24} fill="white" />}
+             </button>
+             <button onClick={nextTrack} className="p-2 text-slate-500 hover:text-white transition-colors active:scale-90"><SkipForward size={20} /></button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3">
+          <Volume2 size={14} className="text-slate-600" />
+          <input 
+            type="range" 
+            min="0" max="1" step="0.01" 
+            value={volume} 
+            onChange={(e) => setVolume(parseFloat(e.target.value))}
+            className="flex-1 h-1 bg-slate-700 rounded-full appearance-none cursor-pointer accent-emerald-500" 
+          />
+        </div>
+      </div>
 
       {activeStep === null && (
         <div className="bg-slate-800/40 p-6 rounded-[2.5rem] border border-emerald-500/20 shadow-2xl space-y-4">
@@ -150,7 +309,7 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
 
       <div className="p-2 bg-slate-800/40 rounded-[2.5rem] border border-white/5">
         <div className="flex justify-between items-center px-4 mb-4 mt-2">
-           <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Peso (30 dias)</h3>
+           <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{isPt ? 'Peso (30 dias)' : 'Weight (30 days)'}</h3>
            <button onClick={() => setShowFullHistory(true)} className="text-[10px] text-emerald-500 font-black">HISTÓRICO</button>
         </div>
         <ProgressChart data={progress.slice(-30)} title="" />
@@ -199,7 +358,7 @@ const WorkoutView: React.FC<Props> = ({ profile, progress, onPlanRequest }) => {
       </div>
 
       {activeStep === null && (
-        <button onClick={startWorkout} className="fixed bottom-24 left-6 right-6 max-w-md mx-auto bg-emerald-600 py-6 rounded-[2.5rem] font-black text-white flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all">
+        <button onClick={startWorkout} className="fixed bottom-24 left-6 right-6 max-w-md mx-auto bg-emerald-600 py-6 rounded-[2.5rem] font-black text-white flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all z-40">
           <Play fill="white" size={24} />{isPt ? 'COMEÇAR TREINO' : 'START WORKOUT'}
         </button>
       )}

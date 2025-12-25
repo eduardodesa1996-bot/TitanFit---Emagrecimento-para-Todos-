@@ -2,11 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, Workout, Meal, IntelItem } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to ensure AI is initialized only when needed and with a valid key
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API_KEY not found in environment. AI features may be limited.");
+    return new GoogleGenAI({ apiKey: "temporary_key_for_build" });
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 const getLanguageName = (lang: string) => lang === 'pt' ? 'Portuguese' : 'English';
 
 export const getFitnessIntelligence = async (goal: string, language: string): Promise<IntelItem[]> => {
+  const ai = getAI();
   const langName = getLanguageName(language);
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -28,6 +37,7 @@ export const getFitnessIntelligence = async (goal: string, language: string): Pr
 };
 
 export const generateDailyWorkout = async (profile: UserProfile): Promise<Workout> => {
+  const ai = getAI();
   const langName = getLanguageName(profile.language);
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -64,6 +74,7 @@ export const generateDailyWorkout = async (profile: UserProfile): Promise<Workou
 };
 
 export const generateMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
+  const ai = getAI();
   const langName = getLanguageName(profile.language);
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -92,6 +103,7 @@ export const generateMealPlan = async (profile: UserProfile): Promise<Meal[]> =>
 };
 
 export const chatWithCoach = async (message: string, profile: UserProfile) => {
+  const ai = getAI();
   const langName = getLanguageName(profile.language);
   const chat = ai.chats.create({
     model: 'gemini-3-flash-preview',
