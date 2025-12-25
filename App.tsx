@@ -76,42 +76,48 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const evolutionInputRef = useRef<{ type: 'before' | 'after' | 'profile' | null }>({ type: null });
 
-  // Load Data with resilience
+  // Load Data with ultra-resilience
   useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem(STORAGE_KEY);
-      const savedProgress = localStorage.getItem(PROGRESS_KEY);
-      
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile);
-        setProfile(parsed);
-        setView('dashboard');
+    const initApp = () => {
+      try {
+        const savedProfile = localStorage.getItem(STORAGE_KEY);
+        const savedProgress = localStorage.getItem(PROGRESS_KEY);
+        
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile);
+          // Auto-repair missing fields if any
+          const repairedProfile = { ...INITIAL_PROFILE, ...parsed };
+          setProfile(repairedProfile);
+          if (repairedProfile.name) setView('dashboard');
+        }
+        
+        if (savedProgress) {
+          setProgress(JSON.parse(savedProgress));
+        } else {
+          setProgress(MOCK_PROGRESS);
+        }
+      } catch (e) {
+        console.error("TitanFit Storage Error: Attempting to recover...", e);
+        // Clear only if absolutely critical
+        if (e instanceof SyntaxError) localStorage.clear();
+      } finally {
+        // Minimum visibility for Splash Screen to ensure assets are ready
+        setTimeout(() => setIsLoaded(true), 1200);
       }
-      
-      if (savedProgress) {
-        setProgress(JSON.parse(savedProgress));
-      } else {
-        setProgress(MOCK_PROGRESS);
-      }
-    } catch (e) {
-      console.error("Critical: Storage corruption detected. Resetting app state.", e);
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(PROGRESS_KEY);
-    } finally {
-      // Small delay to show splash screen
-      setTimeout(() => setIsLoaded(true), 1500);
-    }
+    };
+
+    initApp();
   }, []);
 
   // Sync Data
   useEffect(() => {
-    if (isLoaded && view !== 'onboarding') {
+    if (isLoaded && profile.name) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
     }
-  }, [profile, progress, isLoaded, view]);
+  }, [profile, progress, isLoaded]);
 
-  const t = TRANSLATIONS[profile.language];
+  const t = TRANSLATIONS[profile.language] || TRANSLATIONS.pt;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'profile' | 'before' | 'after') => {
     const file = e.target.files?.[0];
@@ -167,7 +173,6 @@ const App: React.FC = () => {
     }
   };
 
-  // SplashScreen
   if (!isLoaded) {
     return (
       <div className="fixed inset-0 bg-slate-900 flex flex-col items-center justify-center p-10 z-[100]">
@@ -180,7 +185,7 @@ const App: React.FC = () => {
         <h1 className="text-2xl font-black text-white tracking-[0.2em] mb-4">TITANFIT</h1>
         <div className="flex items-center gap-3 text-emerald-500/60 font-black text-[10px] tracking-widest uppercase">
           <RefreshCw className="animate-spin" size={14} />
-          {profile.language === 'pt' ? 'DESPERTANDO O TITÃ...' : 'WAKING UP THE TITAN...'}
+          {t.loading}
         </div>
       </div>
     );
@@ -390,7 +395,6 @@ const App: React.FC = () => {
   );
 };
 
-// Add missing icon for splash screen
 const Trophy = ({ size, className }: { size: number, className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
