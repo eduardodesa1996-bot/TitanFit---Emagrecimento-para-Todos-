@@ -1,6 +1,6 @@
 {
-  "name": "TitanFit: emagrecimento para todos",
-  "description": "A high-performance weight loss application featuring AI-driven workout plans, meal tracking, and a personalized Gemini coach with live voice interaction.",
+  "name": "TitanFit: Emagrecimento para Todos",
+  "description": "App de alta performance com IA para treinos e nutrição personalizada.",
   "requestFramePermissions": [
     "microphone",
     "camera"
