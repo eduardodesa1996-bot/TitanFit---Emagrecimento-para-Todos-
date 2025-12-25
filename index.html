@@ -6,12 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>TitanFit | Inteligência Titã</title>
     
-    <!-- Meta tags for PWA / Mobile Readiness -->
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Alta performance em emagrecimento com IA.">
     
+    <!-- Shim for process.env used by Gemini SDK in some environments -->
+    <script>
+        window.process = window.process || { env: { API_KEY: "" } };
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -24,18 +28,28 @@
             overflow-x: hidden;
             -webkit-tap-highlight-color: transparent;
         }
-        /* Hide scrollbar but keep functionality */
-        ::-webkit-scrollbar {
-            display: none;
+        /* Anti-flash white loading state */
+        #root:empty {
+            background-color: #0f172a;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-
-        /* Prevent zooming on inputs on iOS */
+        #root:empty::after {
+            content: "TITANFIT";
+            color: #10b981;
+            font-weight: 900;
+            letter-spacing: 0.5em;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 0.2; } 50% { opacity: 0.6; } 100% { opacity: 0.2; } }
+        
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        
         @media screen and (max-width: 768px) {
-            input, select, textarea {
-                font-size: 16px !important;
-            }
+            input, select, textarea { font-size: 16px !important; }
         }
     </style>
 <script type="importmap">
