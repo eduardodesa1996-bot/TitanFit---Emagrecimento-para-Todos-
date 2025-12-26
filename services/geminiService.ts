@@ -2,13 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, Workout, Meal, IntelItem } from "../types";
 
-// Função utilitária para obter a chave de forma segura
-const getApiKey = (): string => {
-  try {
-    return process.env.API_KEY || (window as any).process?.env?.API_KEY || "";
-  } catch (e) {
-    return "";
-  }
+// As diretrizes exigem o uso direto de process.env.API_KEY
+const getAI = () => {
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const cleanJsonResponse = (text: string): string => {
@@ -23,10 +19,7 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 export const getFitnessIntelligence = async (goal: string, language: string): Promise<IntelItem[]> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return [];
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAI();
   const langName = language === 'pt' ? 'Portuguese' : 'English';
   
   try {
@@ -52,10 +45,7 @@ export const getFitnessIntelligence = async (goal: string, language: string): Pr
 };
 
 export const generateDailyWorkout = async (profile: UserProfile): Promise<Workout> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
-  const langName = profile.language === 'pt' ? 'Portuguese' : 'English';
-
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Create a weight loss workout JSON for: ${JSON.stringify(profile)}. Respond only with JSON.`,
@@ -91,10 +81,7 @@ export const generateDailyWorkout = async (profile: UserProfile): Promise<Workou
 };
 
 export const generateMealPlan = async (profile: UserProfile): Promise<Meal[]> => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
-  const langName = profile.language === 'pt' ? 'Portuguese' : 'English';
-
+  const ai = getAI();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Generate daily weight loss meal plan array JSON: ${JSON.stringify(profile)}.`,
@@ -122,17 +109,16 @@ export const generateMealPlan = async (profile: UserProfile): Promise<Meal[]> =>
 };
 
 export const chatWithCoach = async (message: string, profile: UserProfile) => {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = getAI();
   const langName = profile.language === 'pt' ? 'Portuguese' : 'English';
   
   const chat = ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: {
-      systemInstruction: `You are Titan, a high-performance coach. Respond in ${langName}. Context: User is ${profile.gender}, goal ${profile.goal}.`,
+      systemInstruction: `You are Titan, a world-class fitness coach. Be concise and motivational. Respond in ${langName}. Gender: ${profile.gender}. Context: ${JSON.stringify(profile)}.`,
     },
   });
 
-  const response = await chat.sendMessage({ message });
+  const response = await chat.sendMessage({ message: message });
   return response.text || "";
 };
