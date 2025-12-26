@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, Workout, Meal, IntelItem } from "../types";
 
-// As diretrizes exigem o uso direto de process.env.API_KEY
+// Função para obter a chave de forma segura de múltiplas fontes possíveis
+const getSafeApiKey = (): string => {
+  return (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY || "";
+};
+
 const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getSafeApiKey();
+  return new GoogleGenAI({ apiKey });
 };
 
 const cleanJsonResponse = (text: string): string => {
@@ -19,10 +24,10 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 export const getFitnessIntelligence = async (goal: string, language: string): Promise<IntelItem[]> => {
-  const ai = getAI();
-  const langName = language === 'pt' ? 'Portuguese' : 'English';
-  
   try {
+    const ai = getAI();
+    const langName = language === 'pt' ? 'Portuguese' : 'English';
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `List top 3 weight loss tips for ${goal}. Respond in ${langName}.`,
@@ -39,7 +44,7 @@ export const getFitnessIntelligence = async (goal: string, language: string): Pr
       url: chunks[i]?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(goal)}+tips`
     }));
   } catch (e) {
-    console.warn("Intelligence failed:", e);
+    console.warn("Titan Intelligence fetch failed (check API_KEY):", e);
     return [];
   }
 };

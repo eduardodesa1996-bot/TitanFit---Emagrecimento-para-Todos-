@@ -7,8 +7,13 @@
     <title>TitanFit | Inteligência Titã</title>
     
     <script>
-        // Garantir que o objeto process exista antes de qualquer carregamento de módulo
-        window.process = window.process || { env: { API_KEY: "" } };
+        // Shim de ambiente ultra-seguro antes de qualquer módulo
+        window.process = window.process || {};
+        window.process.env = window.process.env || {};
+        // Não sobrescreve se a plataforma já injetou a API_KEY
+        if (typeof process !== 'undefined' && process.env) {
+            window.process.env = Object.assign({}, window.process.env, process.env);
+        }
     </script>
 
     <meta name="theme-color" content="#0f172a">
@@ -32,7 +37,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            background: #0f172a;
         }
         #root:empty::after {
             content: "TITANFIT";
